@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Lint
+        run: |
+          uvx ruff check .
+          uvx ruff format --check .
+      - name: Test
+        run: uv run --python 3.12 --group dev pytest -q
+
+  quality-gate:
+    # Runs the whole pipeline on 40,000 synthetic lines. Fails if supplier clustering precision or
+    # level-1 classification accuracy falls below the floor.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Analyze and gate
+        run: |
+          uv run --python 3.12 spendintel analyze --lines 40000 --out data/ci/report.json \
+            --gate --min-supplier-precision 0.97 --min-l1-accuracy 0.97 --summary "$GITHUB_STEP_SUMMARY"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spend-report
+          path: data/ci/report.json
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t spend-intel:ci .
+      - name: Smoke test container
+        run: |
+          docker run -d --name si -p 8849:8849 -e SPENDINTEL_LINES=8000 spend-intel:ci
+          for i in $(seq 1 60); do curl -sf http://localhost:8849/healthz && break; sleep 2; done
+          curl -sf http://localhost:8849/api/summary | grep savings_by_lever
+          curl -sf "http://localhost:8849/api/cube?group_by=l1,bu" | grep '"rows"'
+          curl -sf http://localhost:8849/metrics | grep spendintel_savings_identified_usd
+          docker rm -f si

@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spend Intel</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2330; --muted: #5d6878; --border: #dde2e9; --track: #e8ebf0;
+  --accent: #2f6fdb; --accent-soft: #e4edfc; --good: #11804f; --good-soft: #e3f5ec; --warn: #8a5a00; --warn-soft: #fff4dc;
+  --bad: #b42318; --bad-soft: #fde8e6; --bar: #2f6fdb; --radius: 10px; color-scheme: light;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151c; --panel: #181e27; --text: #e6eaf0; --muted: #9aa5b5; --border: #2a3340; --track: #232b37;
+    --accent: #6c9cf0; --accent-soft: #1b2a44; --good: #4ccb8f; --good-soft: #15302a; --warn: #f3c46b; --warn-soft: #3a2e14;
+    --bad: #ff8a7a; --bad-soft: #3b1d1b; --bar: #6c9cf0; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: hidden; }
+body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+header > * { min-width: 0; overflow-wrap: anywhere; }
+header { padding: 16px 24px 4px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+nav { display: flex; gap: 4px; padding: 8px 24px 0; flex-wrap: wrap; }
+nav a { color: var(--muted); text-decoration: none; padding: 7px 12px; border-radius: 8px; font-weight: 600; }
+nav a.on { background: var(--accent-soft); color: var(--accent); }
+main { padding: 12px 24px 24px; display: grid; gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; min-width: 0; }
+.kpi .v { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { color: var(--muted); margin-top: 2px; }
+.wide { grid-column: span 4; } .half { grid-column: span 2; } .three { grid-column: span 3; }
+.muted { color: var(--muted); } .small { font-size: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; border-top: 0; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scroll { overflow-x: auto; max-width: 100%; }
+.wrap { overflow-wrap: anywhere; }
+.badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 10px; white-space: nowrap; background: var(--track); color: var(--muted); }
+.sim { background: var(--warn-soft); color: var(--warn); }
+.ok { background: var(--good-soft); color: var(--good); }
+.lo { background: var(--bad-soft); color: var(--bad); }
+tr.pick { cursor: pointer; } tr.pick:hover td { background: var(--track); }
+tr.sel td { background: var(--accent-soft); }
+button, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; max-width: 100%; }
+button { cursor: pointer; font-weight: 600; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.crumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.crumbs a { color: var(--accent); cursor: pointer; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 12px; }
+.chart text.v { fill: var(--text); font-variant-numeric: tabular-nums; }
+.chart .gridline { stroke: var(--border); stroke-width: 1; }
+.chart rect.bar { fill: var(--bar); }
+.chart rect.hit:hover + rect.bar, .chart rect.bar:hover { opacity: .8; }
+#tip { position: fixed; pointer-events: none; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); display: none; z-index: 10; max-width: 260px; }
+.members { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+.brief { white-space: pre-wrap; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+.hide { display: none !important; }
+@media (max-width: 900px) {
+  main { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px 16px 16px; }
+  header, nav { padding-left: 16px; padding-right: 16px; }
+  .wide, .half, .three, .panel:not(.kpi) { grid-column: span 2; }
+}
+@media (max-width: 520px) {
+  .kpi .v { font-size: 19px; }
+  .hide-sm { display: none; }
+  th, td { padding: 6px 5px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Spend Intel</h1>
+  <span class="muted">Harrow Valley Manufacturing, 2025 accounts payable (synthetic)</span>
+  <span id="simbadge" class="badge sim">LLM tiers simulated</span>
+</header>
+<nav id="nav">
+  <a href="#/summary" data-v="summary">Summary</a>
+  <a href="#/categories" data-v="categories">Categories</a>
+  <a href="#/suppliers" data-v="suppliers">Supplier review</a>
+  <a href="#/opportunities" data-v="opportunities">Opportunities</a>
+</nav>
+
+<main id="v-summary">
+  <div class="panel kpi"><div class="v" id="k-total">-</div><div class="l">total spend</div></div>
+  <div class="panel kpi"><div class="v" id="k-addr">-</div><div class="l">addressable spend</div></div>
+  <div class="panel kpi"><div class="v" id="k-sav">-</div><div class="l">identified savings, net of overlap</div></div>
+  <div class="panel kpi"><div class="v" id="k-pct">-</div><div class="l">of addressable spend</div></div>
+  <section class="panel three">
+    <h2>Identified savings by lever</h2>
+    <div class="chart" id="lever-chart"></div>
+    <p class="muted small" id="lever-note"></p>
+  </section>
+  <section class="panel">
+    <h2>Data and models</h2>
+    <table id="quality"></table>
+  </section>
+  <section class="panel half">
+    <h2>Spend by category</h2>
+    <div class="scroll"><table id="by-l1"></table></div>
+  </section>
+  <section class="panel half">
+    <h2>Classification cascade</h2>
+    <div class="scroll"><table id="tiers"></table></div>
+    <p class="muted small" id="tier-note"></p>
+  </section>
+</main>
+
+<main id="v-categories" class="hide">
+  <section class="panel wide">
+    <div class="crumbs" id="crumbs"></div>
+    <div class="scroll"><table id="cat-table"></table></div>
+    <p class="muted small">HHI is the sum of squared supplier shares (0 to 10,000). Tail suppliers make up the last 20% of a category's spend. Click a row to drill down.</p>
+  </section>
+  <section class="panel wide hide" id="brief-panel">
+    <div class="row" style="justify-content:space-between"><h2 id="brief-title">Category brief</h2><span class="badge" id="brief-badge"></span></div>
+    <p class="brief" id="brief-text"></p>
+  </section>
+</main>
+
+<main id="v-suppliers" class="hide">
+  <div class="panel kpi"><div class="v" id="s-prec">-</div><div class="l">pairwise precision</div></div>
+  <div class="panel kpi"><div class="v" id="s-rec">-</div><div class="l">pairwise recall</div></div>
+  <div class="panel kpi"><div class="v" id="s-clu">-</div><div class="l">clusters from raw names</div></div>
+  <div class="panel kpi"><div class="v" id="s-open">-</div><div class="l">open review items</div></div>
+  <section class="panel wide">
+    <h2>Review queue, largest spend first</h2>
+    <div class="scroll"><table id="review"></table></div>
+    <p class="muted small" id="review-note"></p>
+  </section>
+</main>
+
+<main id="v-opportunities" class="hide">
+  <section class="panel half">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h2 style="margin:0">Opportunities</h2>
+      <select id="f-lever"><option value="">all levers</option></select>
+    </div>
+    <div class="scroll"><table id="opps"></table></div>
+  </section>
+  <section class="panel half">
+    <h2 id="ev-title">Evidence</h2>
+    <p class="muted small" id="ev-sub">Pick an opportunity to see the invoice lines behind it.</p>
+    <div class="scroll"><table id="evidence"></table></div>
+  </section>
+</main>
+<div id="tip"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const money = (x) => Math.abs(x) >= 1e6 ? `$${(x / 1e6).toFixed(2)}M` : Math.abs(x) >= 1e3 ? `$${(x / 1e3).toFixed(0)}K` : `$${Math.round(x)}`;
+const pct = (x, d = 1) => `${(x * 100).toFixed(d)}%`;
+const get = (u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u); return r.json(); });
+const tip = $("#tip");
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = "block"; const x = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8); tip.style.left = x + "px"; tip.style.top = (e.clientY + 12) + "px"; }
+function hideTip() { tip.style.display = "none"; }
+
+function barChart(el, rows) {
+  // One series, one value axis. Horizontal bars so long lever names stay readable on a phone.
+  const w = 640, rowH = 34, labelW = Math.min(250, el.clientWidth * 0.42 || 250), pad = 70;
+  const h = rows.length * rowH + 24;
+  const max = Math.max(...rows.map((r) => r.value)) || 1;
+  const x = (v) => labelW + (w - labelW - pad) * (v / max);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
+  let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Identified savings by lever">`;
+  for (const t of ticks) s += `<line class="gridline" x1="${x(t)}" x2="${x(t)}" y1="0" y2="${h - 20}"/><text x="${x(t)}" y="${h - 4}" text-anchor="middle">${money(t)}</text>`;
+  rows.forEach((r, i) => {
+    const y = i * rowH + 6, bw = Math.max(2, x(r.value) - labelW);
+    s += `<text x="${labelW - 8}" y="${y + 15}" text-anchor="end">${esc(r.name)}</text>`;
+    s += `<rect class="bar" data-i="${i}" x="${labelW}" y="${y + 3}" width="${bw}" height="18" rx="4"/>`;
+    s += `<text class="v" x="${labelW + bw + 6}" y="${y + 16}">${money(r.value)}</text>`;
+    s += `<rect class="hit" data-i="${i}" x="0" y="${y}" width="${w}" height="${rowH}" fill="transparent"/>`;
+  });
+  el.innerHTML = s + "</svg>";
+  el.querySelectorAll("rect.hit").forEach((n) => {
+    const r = rows[+n.dataset.i];
+    n.addEventListener("mousemove", (e) => showTip(e, `<b>${esc(r.name)}</b><br>${money(r.value)} across ${r.count} opportunities`));
+    n.addEventListener("mouseleave", hideTip);
+  });
+}
+
+let S = null;
+async function loadSummary() {
+  S = await get("/api/summary");
+  const s = S.summary;
+  $("#k-total").textContent = money(s.total_spend);
+  $("#k-addr").textContent = money(s.addressable_spend);
+  $("#k-sav").textContent = money(S.savings_total);
+  $("#k-pct").textContent = pct(S.savings_total / s.addressable_spend);
+  $("#simbadge").classList.toggle("hide", !S.classification.llm_simulated);
+  const levers = S.savings_by_lever.filter((l) => l.lever !== "duplicates");
+  barChart($("#lever-chart"), levers);
+  const dup = S.savings_by_lever.find((l) => l.lever === "duplicates");
+  $("#lever-note").textContent = `Bars are gross by lever, ${money(S.savings_gross)} in total. Lines claimed by more than one lever are counted once in the headline (${money(S.overlap_removed)} removed). Duplicate invoices are a recovery, not a saving: ${money(dup.value)} across ${dup.count} invoices.`;
+  const c = S.classification, ev = S.evaluation;
+  $("#quality").innerHTML = [
+    ["Invoice lines", s.lines.toLocaleString()],
+    ["ERPs", Object.entries(S.data_quality.by_erp).map(([k, v]) => `${k} ${v.toLocaleString()}`).join(", ")],
+    ["Raw supplier names", S.data_quality.distinct_supplier_strings],
+    ["Supplier clusters", s.suppliers],
+    ["Tail suppliers", `${s.tail.tail_suppliers} (${pct(s.tail.tail_spend_share, 0)} of spend)`],
+    ["Clustering precision", pct(S.suppliers.eval.precision)],
+    ["L1 accuracy", pct(c.cascade.l1)],
+    ["GL account as L1", pct(c.gl_account_l1_accuracy)],
+    ["Duplicate recall", pct(ev.duplicates.recall, 0)],
+  ].map(([k, v]) => `<tr><td class="muted">${k}</td><td class="num">${esc(v)}</td></tr>`).join("");
+  const tot = s.total_spend;
+  $("#by-l1").innerHTML = `<tr><th>Category</th><th class="num">Spend</th><th class="num">Share</th><th class="num hide-sm">Suppliers</th></tr>` +
+    s.by_l1.map((r) => `<tr class="pick" data-c="${r.l1}"><td class="wrap">${esc(r.l1_name)}</td><td class="num">${money(r.spend)}</td><td class="num">${pct(r.spend / tot)}</td><td class="num hide-sm">${r.suppliers}</td></tr>`).join("");
+  $("#by-l1").querySelectorAll("tr.pick").forEach((tr) => tr.onclick = () => { location.hash = `#/categories/l2/${tr.dataset.c}`; });
+  const t = c.tiers.by_tier;
+  const sim = (k) => (k === "haiku" || k === "opus") && c.llm_simulated ? ' <span class="badge sim">simulated</span>' : "";
+  $("#tiers").innerHTML = `<tr><th>Tier</th><th class="num">Lines</th><th class="num">L1</th><th class="num">L2</th><th class="num">L3</th></tr>` +
+    Object.entries(t).map(([k, v]) => `<tr><td>${k}${sim(k)}</td><td class="num">${pct(v.share)}</td><td class="num">${v.accuracy ? pct(v.accuracy.l1) : "-"}</td><td class="num">${v.accuracy ? pct(v.accuracy.l2) : "-"}</td><td class="num">${v.accuracy ? pct(v.accuracy.l3) : "-"}</td></tr>`).join("") +
+    `<tr><td><b>Cascade</b></td><td class="num">100%</td><td class="num"><b>${pct(c.cascade.l1)}</b></td><td class="num"><b>${pct(c.cascade.l2)}</b></td><td class="num"><b>${pct(c.cascade.l3)}</b></td></tr>` +
+    `<tr><td class="muted">No LLM tiers</td><td class="num"></td><td class="num">${pct(c.no_llm.l1)}</td><td class="num">${pct(c.no_llm.l2)}</td><td class="num">${pct(c.no_llm.l3)}</td></tr>`;
+  $("#tier-note").textContent = `${c.eval_lines.toLocaleString()} unlabeled lines, ${c.tiers.distinct_keys.toLocaleString()} distinct description and supplier keys. LLM cost $${c.tiers.cost_per_10k_lines.toFixed(2)} per 10,000 lines${c.llm_simulated ? " (simulated token counts at list prices)" : ""}.`;
+}
+
+async function loadCategories(level, parent) {
+  const q = parent ? `?level=${level}&parent=${encodeURIComponent(parent)}` : `?level=${level}`;
+  const d = await get(`/api/categories${q}`);
+  const crumbs = [`<a data-h="#/categories">All categories</a>`];
+  if (parent) {
+    const l1 = parent.split("-")[0];
+    if (level === "l3") crumbs.push(`<a data-h="#/categories/l2/${l1}">${esc(l1)}</a>`);
+    crumbs.push(`<span>${esc(d.parent_name)}</span>`);
+  }
+  $("#crumbs").innerHTML = crumbs.join('<span class="muted">/</span>');
+  $("#crumbs").querySelectorAll("a").forEach((a) => a.onclick = () => { location.hash = a.dataset.h; });
+  $("#cat-table").innerHTML = `<tr><th>Category</th><th class="num">Spend</th><th class="num">Suppliers</th><th class="num">HHI</th><th class="hide-sm">Top suppliers</th><th class="num hide-sm">Tail</th><th class="num hide-sm">On PO</th><th></th></tr>` +
+    d.rows.map((r) => `<tr class="pick" data-c="${r.code}"><td class="wrap">${esc(r.name)}${r.addressable ? "" : ' <span class="badge">not addressable</span>'}</td><td class="num">${money(r.spend)}</td><td class="num">${r.suppliers}</td><td class="num"><span class="badge ${r.hhi < 1500 ? "lo" : r.hhi > 2500 ? "ok" : ""}">${Math.round(r.hhi).toLocaleString()}</span></td><td class="small muted wrap hide-sm">${r.top_suppliers.slice(0, 3).map((s) => `${esc(s.supplier)} ${pct(s.share, 0)}`).join(", ")}</td><td class="num hide-sm">${r.tail_suppliers}</td><td class="num hide-sm">${pct(r.po_share, 0)}</td><td><button data-b="${r.code}">Brief</button></td></tr>`).join("");
+  const next = { l1: "l2", l2: "l3" }[level];
+  $("#cat-table").querySelectorAll("tr.pick").forEach((tr) => tr.onclick = (e) => {
+    if (e.target.dataset.b) return showBrief(e.target.dataset.b);
+    if (next) location.hash = `#/categories/${next}/${tr.dataset.c}`; else showBrief(tr.dataset.c);
+  });
+}
+
+async function showBrief(code) {
+  const p = $("#brief-panel");
+  p.classList.remove("hide");
+  $("#brief-text").textContent = "Writing...";
+  const b = await get(`/api/categories/${encodeURIComponent(code)}/brief`);
+  $("#brief-title").textContent = `Category brief: ${b.facts.name}`;
+  $("#brief-badge").textContent = b.simulated ? "offline template, no model call" : b.writer;
+  $("#brief-badge").className = "badge " + (b.simulated ? "sim" : "ok");
+  $("#brief-text").textContent = b.text + (b.fallback_reason ? `\n\n(Fell back to the template: ${b.fallback_reason})` : "");
+  p.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function loadReview() {
+  const [c, q] = await Promise.all([get("/api/suppliers/clusters?limit=1"), get("/api/suppliers/review?limit=40")]);
+  $("#s-prec").textContent = pct(c.eval.precision);
+  $("#s-rec").textContent = pct(c.eval.recall);
+  $("#s-clu").textContent = `${c.stats.clusters} / ${c.stats.raw_names}`;
+  $("#s-open").textContent = q.open;
+  $("#review-note").textContent = `Names scoring ${c.stats.auto_threshold} or more are merged automatically. Pairs from ${c.stats.review_threshold} to ${c.stats.auto_threshold} and clusters held together by a weak link come here. Blocking compared ${c.stats.pairs_compared.toLocaleString()} of ${c.stats.pairs_possible.toLocaleString()} possible pairs. ${q.decided} decisions this session.`;
+  const list = (ms) => `<ul class="members">${ms.slice(0, 6).map((m) => `<li class="wrap">${esc(m)}</li>`).join("")}${ms.length > 6 ? `<li>${ms.length - 6} more</li>` : ""}</ul>`;
+  $("#review").innerHTML = `<tr><th>Item</th><th class="num">Score</th><th class="num">Spend</th><th>Decision</th></tr>` + q.items.map((it) => {
+    const isPair = it.kind === "possible_merge";
+    const body = isPair
+      ? `<b>Possible merge</b><div class="wrap">${esc(it.a_name)}</div>${list(it.a_members)}<div class="wrap" style="margin-top:6px">${esc(it.b_name)}</div>${list(it.b_members)}`
+      : `<b>Confirm cluster</b><div class="wrap">${esc(it.a_name)}</div>${list(it.a_members)}`;
+    const acts = isPair
+      ? `<button class="primary" data-id="${it.id}" data-a="merge">Merge</button> <button data-id="${it.id}" data-a="reject">Keep apart</button>`
+      : `<button class="primary" data-id="${it.id}" data-a="confirm">Confirm</button> <button data-id="${it.id}" data-a="split" data-n="${esc(it.a_members[it.a_members.length - 1])}">Split last name</button>`;
+    return `<tr><td>${body}</td><td class="num">${it.score.toFixed(3)}</td><td class="num">${money(it.spend)}</td><td><div class="row">${acts}</div></td></tr>`;
+  }).join("");
+  $("#review").querySelectorAll("button").forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    await fetch(`/api/suppliers/review/${b.dataset.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: b.dataset.a, name: b.dataset.n || null }) });
+    loadReview();
+  });
+}
+
+const LEVER = { price_variance: "Price variance", consolidation: "Consolidation", payment_terms: "Payment terms", maverick: "Maverick", contract_leakage: "Leakage", duplicates: "Duplicate" };
+async function loadOpps() {
+  const sel = $("#f-lever");
+  if (sel.options.length === 1) {
+    for (const [k, v] of Object.entries(LEVER)) sel.insertAdjacentHTML("beforeend", `<option value="${k}">${v}</option>`);
+    sel.onchange = loadOpps;
+  }
+  const d = await get(`/api/opportunities?limit=60${sel.value ? `&lever=${sel.value}` : ""}`);
+  $("#opps").innerHTML = `<tr><th>Opportunity</th><th class="hide-sm">Lever</th><th class="num">Value</th></tr>` +
+    d.rows.map((o) => `<tr class="pick" data-id="${o.id}"><td class="wrap">${esc(o.title)}<div class="small muted">${esc(o.category_name || o.supplier || "")}</div></td><td class="hide-sm"><span class="badge">${LEVER[o.lever]}</span></td><td class="num">${money(o.value)}</td></tr>`).join("");
+  $("#opps").querySelectorAll("tr.pick").forEach((tr) => tr.onclick = () => {
+    $("#opps").querySelectorAll("tr").forEach((x) => x.classList.remove("sel"));
+    tr.classList.add("sel");
+    showEvidence(tr.dataset.id);
+  });
+  if (d.rows.length) $("#opps").querySelector("tr.pick").click();
+}
+
+async function showEvidence(id) {
+  const o = await get(`/api/opportunities/${id}`);
+  $("#ev-title").textContent = `Evidence: ${LEVER[o.lever]}, ${money(o.value)}`;
+  const det = o.details || {};
+  const facts = Object.entries(det).filter(([, v]) => typeof v !== "object").map(([k, v]) => `${k.replace(/_/g, " ")} ${typeof v === "number" && v > 1000 ? v.toLocaleString() : v}`);
+  $("#ev-sub").textContent = `${o.title}. ${facts.join(", ")}.`;
+  const ev = o.evidence || [];
+  if (!ev.length) { $("#evidence").innerHTML = ""; return; }
+  const skip = new Set(["line_ids", "supplier"]);
+  const cols = Object.keys(ev[0]).filter((k) => !skip.has(k) || o.lever === "contract_leakage" && k === "supplier");
+  const numeric = (k) => typeof ev[0][k] === "number";
+  $("#evidence").innerHTML = `<tr>${cols.map((k) => `<th class="${numeric(k) ? "num" : ""}">${k.replace(/_/g, " ")}</th>`).join("")}</tr>` +
+    ev.map((r) => `<tr>${cols.map((k) => `<td class="${numeric(k) ? "num" : k === "description" ? "wrap" : ""}" style="${numeric(k) || k === "description" ? "" : "white-space:nowrap"}">${esc(typeof r[k] === "number" && !k.endsWith("id") ? (Math.abs(r[k]) >= 100 ? r[k].toLocaleString(undefined, { maximumFractionDigits: 2 }) : r[k]) : r[k])}</td>`).join("")}</tr>`).join("");
+}
+
+function route() {
+  const parts = (location.hash || "#/summary").slice(2).split("/");
+  const v = parts[0] || "summary";
+  for (const id of ["summary", "categories", "suppliers", "opportunities"]) $(`#v-${id}`).classList.toggle("hide", id !== v);
+  document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("on", a.dataset.v === v));
+  if (v === "summary") loadSummary();
+  if (v === "categories") { $("#brief-panel").classList.add("hide"); loadCategories(parts[1] || "l1", parts[2]); }
+  if (v === "suppliers") loadReview();
+  if (v === "opportunities") loadOpps();
+}
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>
